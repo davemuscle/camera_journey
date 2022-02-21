@@ -260,3 +260,244 @@ Description | Image
 VHDL Register File with Comments for Parsing | ![Image](/doc/example_register_desc.png) 
 Generated FPGA Class | ![Image](/doc/FPGA_def_class.png) 
 Generated Register Class | ![Image](/doc/REG_def_class.png)
+Using iPython | ![Image](/doc/open_ipython.png)
+Help Command for the FPGA | ![Image](/doc/show_fpga_regs.png)
+Help Command for the Registers | ![Image](/doc/show_help_regs.png)
+iPython with tab auto-completion | ![Image](/doc/tab_completion.png)
+Writing to all 32-bits of a register | ![Image](/doc/write_to_32.png)
+Writing to a single bitfield of a register | ![Image](/doc/write_to_bitfield.png)
+
+Was there a better way to do this? For sure. If I ever decide to use Python again for this, I’ll use
+XML-type formatting in the RTL to standardize things instead of using my own format. Is this kind of
+an abuse of the Python class construct? Ha, yeah!
+
+## Twist Three: The Double Cameras
+One of the main projects floating around online for the DE10-Nano is a “Real-time HDR Video”
+project. It’s even packaged with the System-CD by Terasic. The idea involves feeding two camera
+streams into the FPGA with differing exposure settings. The streams are then mixed together to give
+a single feed but with a higher dynamic range. I decided I wanted to do something similar. Maybe use
+two cameras to emulate our brain’s depth perception, or do some parallax effect.
+
+I designed a PCB in KiCad to hold two cameras, sent it off, and had it back in a week or so. It’s a
+really simple board that just plugs into one of the 2x20 headers on the DE10-Nano, and then two
+Waveshare cameras plug into the PCB to give two streams. When I made the PCB, I also included a
+design to hold four cameras, just in case I wanted to try and do something with 360 degree coverage.
+
+![Image](/doc/camera_plugin_board.png) | ![Image](/doc/dualcams.jpg)
+:--: | :--:
+*Camera Board PCB* | *Dual Camera Board in Action*
+
+The PCB worked fine, but the Waveshare camera modules definitely were not behaving the way I
+expected. Two OV5460 camera modules with the same external input clocks, same I2C inputs, and same
+register initializations do not behave the same way!
+
+My first approach to fix this was using an asynchronous FIFO to match the rates, IE: if one camera
+sent their start-of-frame 10 clocks early, then it was delayed and the proper CDC was applied to
+make sure the streams lined up. The biggest problem with this was the skew between frames. Both
+cameras need to be running at exactly the same FPS, and that just won’t happen. Eventually the skew
+would cause the FIFO to overflow, and then it’s over. The reference project does some hack where
+they lower the external clock rate of one camera for a short amount of time, but I don’t like that.
+
+![Image](/doc/cam_skew.gif) | ![Image](/doc/awful_cam_noise.gif)
+:--: | :--:
+*Dual Camera Skew* | *Awful Camera Noise*
+
+The best solution for me would be to upgrade the framebuffer to support multiple channels. So I did.
+But then Qsys reported the HPS couldn’t support multiple AXI channels, so I’d need to either write
+an interconnect or downgrade back to the Avalon bus. This annoyed me, so I started evaluating
+options.
+
+The quality of the camera streams wasn’t even good: they were filled with intensive raw pixel noise.
+Even my work with just one of the camera modules suffered from this. I tried tons of register
+configurations and couldn’t get the noise to go away. The OV5640 manual lists a maximum of 3.0V on
+the digital IO, but Waveshare is driving them with 3.3V, maybe that’s it? The horrible Waveshare
+board is also driving IO pins directly to 3.3V and GND (seriously, look that up), maybe that's it?
+The DVP mode is a parallel video bus running at ~80 MHz, so there is probably extreme crosstalk
+happening between the data bits, maybe that’s it? 
+
+Either way, I wasn’t too excited about working more with these camera modules. It was time to move
+on. At least I had got my demo to the point of being able to switch between camera streams. In the
+GIF below you can see the parallax effect for a flash drive closely in front of both cameras. This
+is the same thing as putting your thumb in front of your face, then alternating between which eye
+you have open.
+
+![Image](/doc/cam_skew.gif)
+:--:
+*Camera Parallax*
+
+## Twist Four: The IP Camera
+
+This DE10-Nano board has a few interesting peripherals connected only to the HPS: ethernet, USB-OTG,
+and an accelerometer. So far, the entire project hasn’t touched these because I’ve stayed away from
+the HPS. Not anymore, I’m diving right in!
+
+The new idea was to buy an IP camera from Amazon, plug it into the ethernet port on the DE10-Nano,
+and have a Linux image loaded onto the ARM CPU to pull from the camera. I could then use the FPGA to
+apply video effects, then send it over the USB port to my PC as a UVC Webcam.
+
+I bought a cheap camera, plugged it into my router, and logged into its HTML page. This was so
+refreshing just being able to mouse around and change the camera settings, instead of sending
+commands over an I2C bus! I made sure the camera wasn’t DOA by viewing the feed in Internet
+Explorer.
+
+![Image](/doc/cam_amazon.png)
+:--:
+*IP Security Camera*
+
+After making sure the IP address was static, I connected the camera directly to the DE10-Nano and
+started poking around in Linux. I wanted to see packets being sent that carried the video data, even
+if I couldn’t view the frames. I used ifconfig and tcpdump to try and read packets. The main thing I
+could see was the camera asking for a MAC address over ARP.
+
+![Image](/doc/arp.png)
+:--:
+*Viewing Packets and ARP Requests*
+
+Even after making sure the ARP was set up correctly, I could tell the camera wasn’t sending enough
+data for a video stream. So there is some initialization that needs to happen here. I put the camera
+back into the router, and used Wireshark on my main PC to see what was happening.
+
+![Image](/doc/no_video_packets.png) | ![Image](/doc/video_packets.png)
+:--: | :--:
+*Slow Packets with No Video | RTSP Packets using UDP to Send Video*
+
+I determined that I shouldn’t be thinking about this in such a low-level way. Eg: I don’t need to
+manually construct the TCP packets to initialize this. There is already software to do it all. With
+research, FFmpeg seemed like the way to go.
+
+## H264 and FFMPEG
+
+FFMPEG is a FOSS library for performing various video processing applications. Most specifically,
+with the installation of libx264, it could read H.264 encoded video over an RTSP stream. This is
+exactly what my camera is sending, so I started working on getting FFmpeg installed.
+
+The Linux distribution that Terasic gives with the System-CD is Angstrom. I tried using ‘opkg’ to
+install FFmpeg, but it wasn’t giving me anything usable. I also didn’t see an option for libx264. So
+I decided to compile it from source.
+
+I used GIT to pull both sets of source codes, and started running Makefiles. I followed some
+instructions online and had to manually modify a few paths. Libx264 compiles pretty quickly, but
+FFmpeg was taking a few hours. FFmpeg also failed about an hour due to memory constraints, so I
+plugged in a 16GB flash drive, mounted it in Linux, and compiled it under there. Eventually I had a
+usable FFmpeg binary.
+
+**Editor's note 02/20/2022: Cross compiling here would have been a better choice**
+
+![Image](/doc/from_source.jpg)
+:--:
+*Compiling FFmpeg with an SD card*
+
+FFmpeg could now pull a single frame from the camera and convert it into JPG. I opened an SFTP
+session within MobaXterm to view the image over windows by just double clicking it. Even if it’s out
+of focus, it’s looking good! Much less painful than the OV5640. I also tested FFmpeg by converting a
+view seconds of the stream into an MP4, and it worked decently well. It was a bit slow though.
+
+![Image](/doc/running_ffmpeg_single.png)
+:--:
+*Capturing a Still with FFmpeg*
+
+![Image](/doc/talking_to_china.png)
+:--:
+*Bonus: Security camera trying to send data back to China. Hope you enjoyed the bathrobe show.*
+
+## Hardware Software Bridge
+
+The next step was to get the IP camera feed to show up on my HDMI monitor/TV. This required
+functional communication between the HPS and FPGA. I quickly converted my framebuffer into a
+framestreamer, which would only read from the DDR3 and let the HPS fill the memory with what should
+be shown on the screen. I also added some AXI ports in the Qsys to allow the HPS to control the
+framestreamer parameters like the frame offsets, which frame number is active, and the resolution of
+the frame. These AXI ports would connect the FPGA to the HPS via the “lighweight AXI bridge”, which
+was viewable in the device tree.
+
+![Image](/doc/FPGA_IPcam.png)
+:--:
+*Simpler FPGA Design to Leverage SW*
+
+It was quite a breath of fresh air writing C code for this. I memory mapped the lightweight bridge,
+and three portions of memory in DDR3 for the three triple-buffered frames. My first check was to
+fill that image-space and make sure it would show up on the screen. On my Windows PC I converted a
+JPG image to a binary file, then used C code on the DE10-Nano to write the binary file into DDR3
+memory. The output is below.
+
+![Image](/doc/copy_buffer_c_code.png)
+:--:
+*C code snippet to copy the binary file into shared SDRAM*
+
+![Image](/doc/wedding.jpg)
+:--:
+*HW SW Bridge in Action: Software Sets Up the Image, Hardware Displays it*
+
+## Journey's End
+
+Things fell apart when I wanted to see the real-time security camera video on the monitor. The ARM
+CPU was just not keeping up with the requirements to read the RTSP packets, decode the H264 stream,
+and convert it to raw RGB video. I checked the CPU usage with “htop”, and both were at 100%. The
+FPGA also wasn’t helping, because it has to take priority over the memory controller to read the
+frames at a constant rate. Since the memory controller arbitrates access to the FPGA and HPS, there
+is some slowdown here. Even with a lower resolution I couldn't get a good output.
+
+I had hit the limit, and was out of ideas. This camera was definitely not right for the project
+goals (if there ever were any), and I had enough with the twists and turns, so I called it quits.
+The video shown at the top and on the front page was the farthest I got with this camera. There were
+definitely still improvements needed to the C code and FPGA design.
+
+I take a lot of pride in having the grit to push through issues and never giving up, but the idea of
+moving on and doing something new is too exciting. So this marked the end of the camera journey.
+
+![Image](/doc/ip_setup.png) | ![Image](/doc/wave.gif)
+:--: | :--:
+*IP Camera Setup to DE10-Nano Embedded Linux* | *Glitchy, High Latency, ~1FPS IP Camera Output*
+
+| Youtube Videos |
+| :--: |
+| *Camera Journey Nightmare* |
+| [![Image](/doc/vid01_tb.png)](https://youtu.be/W62MrYm8ThQ) |
+
+## In Retrospect
+
+Here are various things that I got some exposure to, designed, or enjoyed doing:
+- Serial interfaces like UART and I2C 
+- Debayer RTL block
+- Framebuffer RTL block
+- Asynchronous FIFOs, handshake-based pulse synchronizers, CDC with >2 clock domains
+- Video verification techniques, testbench improvements
+- Python generated classes for FPGA control
+- Quartus flow (even if it was just clicking in the GUI)
+- Quartus Qsys Design, using Altera IP (PLLs)
+- U-Boot
+- Embedded Linux
+- Basic Networking (I'm still a baby - but this was good to learn)
+- Real C-code (memory mapping, malloc, free)
+
+Here are some of the ideas I had that didn't pan out, or that I didn't get to:
+- Ray-tracing
+- Face Detection via Viola Jones (did a lot of MATLAB studying on this, but struggled with it. Neural network next time)
+- Real-time Video Fx in RTL
+- Stereoscopics
+
+Here are some of the things I didn't like:
+- Altera/Intel Documentation, lack of active forum compared to Xilinx
+- Cyclone V preloader issues
+
+**Editor's Note, 02/20/2022: Looks like Xilinx forums are going in a similar direction?**
+
+## Downloads
+[OV5640 Init Sequence for 1080p DVP Mode](/doc/ov5640_init.txt)
+[ADV7513 Init Sequence for DE10-Nano at 24-bit RGB 1080](/doc/adv7513_init.txt)
+
+## References
+1. [Terasic, DE10-Nano Kit Downloads](https://www.terasic.com.tw/cgi-bin/page/archive.pl?Language=English&No=1046&PartNo=4)
+2. [Analog Devices, ADV7513 Programming Guide](https://www.analog.com/media/en/technical-documentation/user-guides/ADV7513_Programming_Guide.pdf)
+3. [Waveshare (hooligans), OV5640 Board](https://www.waveshare.com/wiki/OV5640_Camera_Board_(B))
+4. [Sparkfun, OV5640 Manual](https://cdn.sparkfun.com/datasheets/Sensors/LightImaging/OV5640_datasheet.pdf)
+5. [Xenpac/sun4csi, Great OV5640 Driver](https://github.com/xenpac/sun4i_csi/blob/master/device/ov5640.c)
+6. [Standford, High-Quality Linear Interpolation For Demosaicing of Bayer-Patterned Color Images](https://stanford.edu/class/ee367/reading/Demosaicing_ICASSP04.pdf)
+7. [Altera, Avalon Bus Spec](http://www1.cs.columbia.edu/~sedwards/classes/2011/4840/mnl_avalon_spec.pdf)
+8. [ARM, AXI Bus Spec](http://www.gstitt.ece.ufl.edu/courses/fall15/eel4720_5721/labs/refs/AXI4_specification.pdf)
+9. [Intel Forum, How can I enable the FPGA2SDRAM bridge on Cyclone V SOC devices?](https://www.intel.com/content/www/us/en/support/programmable/articles/000086918.html)
+10. [Criticallink.com, Important Note about FPGA/HPS SDRAM Bridge](https://support.criticallink.com/redmine/projects/mityarm-5cs/wiki/Important_Note_about_FPGAHPS_SDRAM_Bridge)
+11. [Oguz Meteer, Building embedded Linux for the Terasic DE10-Nano](https://bitlog.it/20170820_building_embedded_linux_for_the_terasic_de10-nano.html)
+12. [Altera, Cyclone V HPS TRM](https://www.intel.com/content/dam/www/programmable/us/en/pdfs/literature/hb/cyclone-v/cv_54001.pdf)
+13. [Wimsworld, New FFMPEG install on BeagleBone Black](https://wimsworld.wordpress.com/2013/06/26/new-ffmpeg-install-on-beaglebone-black/)
+14. [Batchloaf, A simple way to read and write audio and video files in C using FFmpeg](https://batchloaf.wordpress.com/2017/02/12/a-simple-way-to-read-and-write-audio-and-video-files-in-c-using-ffmpeg-part-2-video/)
