@@ -14,6 +14,11 @@ few weeks to play(?) Skyrim, a few weeks to play Valheim, some time to goof arou
 bot in Python, and some time to speedrun video games. There were also a lot of nights of just not
 wanting to do anything technical after getting off work.
 
+| Youtube Videos |
+| :--: |
+| *Camera Journey Nightmare* |
+| [![Image](/doc/vid01_tb.png)](https://youtu.be/W62MrYm8ThQ) |
+
 ## Journey's Start
 It all started when I bought another FPGA board after the Fractal Project (link). Instead of getting
 another Xilinx board, I decided I was going to go back to Altera with the DE10-Nano by Terasic.
@@ -231,8 +236,7 @@ my 96-Note Spectrum Analyzer.
 
 | ![Image](/doc/macman.png) |
 | :--: |
-| *You can get some pretty funky outputs with a buggy FPGA design! This was created due to a FIFO
-underflow while simulating my debayer block.* |
+| *You can get some pretty funky outputs with a buggy FPGA design! This was created due to a FIFO underflow while simulating my debayer block.* |
 
 ## Python Control via UART
 
@@ -445,14 +449,10 @@ definitely still improvements needed to the C code and FPGA design.
 I take a lot of pride in having the grit to push through issues and never giving up, but the idea of
 moving on and doing something new is too exciting. So this marked the end of the camera journey.
 
-![Image](/doc/ip_setup.png) | ![Image](/doc/wave.gif)
+![Image](/doc/ip_setup.jpg) | ![Image](/doc/wave.gif)
 :--: | :--:
 *IP Camera Setup to DE10-Nano Embedded Linux* | *Glitchy, High Latency, ~1FPS IP Camera Output*
 
-| Youtube Videos |
-| :--: |
-| *Camera Journey Nightmare* |
-| [![Image](/doc/vid01_tb.png)](https://youtu.be/W62MrYm8ThQ) |
 
 ## In Retrospect
 
@@ -483,8 +483,8 @@ Here are some of the things I didn't like:
 **Editor's Note, 02/20/2022: Looks like Xilinx forums are going in a similar direction?**
 
 ## Downloads
-[OV5640 Init Sequence for 1080p DVP Mode](/doc/ov5640_init.txt)
-[ADV7513 Init Sequence for DE10-Nano at 24-bit RGB 1080](/doc/adv7513_init.txt)
+- [OV5640 Init Sequence for 1080p DVP Mode](/doc/ov5640_init.txt)
+- [ADV7513 Init Sequence for DE10-Nano at 24-bit RGB 1080](/doc/adv7513_init.txt)
 
 ## References
 1. [Terasic, DE10-Nano Kit Downloads](https://www.terasic.com.tw/cgi-bin/page/archive.pl?Language=English&No=1046&PartNo=4)
