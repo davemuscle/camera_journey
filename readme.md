@@ -256,8 +256,6 @@ be imported and used for easily accessing FPGA registers without having to remem
 or bitfield locations.
 
 | ![Image](/doc/example_register_desc.png) | ![Image](/doc/FPGA_def_class.png) | ![Image](/doc/REG_def_class.png) |
-| :--: | :--: | :--: |
 | Register File with Comments for Parsing | Generated FPGA Class | Generated Register Class |
 | ![Image](/doc/example_register_desc.png) | ![Image](/doc/FPGA_def_class.png) | ![Image](/doc/REG_def_class.png) |
-| :--: | :--: | :--: |
 | Register File with Comments for Parsing | Generated FPGA Class | Generated Register Class |
