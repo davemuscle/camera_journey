@@ -1,4 +1,4 @@
-# Mandlebrot Fractal Engine - FPGA
+# Camera Journey Nonrelease - FPGA
 ![Image](/doc/cam_switching.gif)
 
 *Migrated to Git on February 20th, 2022. Original release on May 23rd, 2021*.
@@ -258,4 +258,6 @@ or bitfield locations.
 | ![Image](/doc/example_register_desc.png) | ![Image](/doc/FPGA_def_class.png) | ![Image](/doc/REG_def_class.png) |
 | :--: | :--: | :--: |
 | Register File with Comments for Parsing | Generated FPGA Class | Generated Register Class |
-
+| ![Image](/doc/example_register_desc.png) | ![Image](/doc/FPGA_def_class.png) | ![Image](/doc/REG_def_class.png) |
+| :--: | :--: | :--: |
+| Register File with Comments for Parsing | Generated FPGA Class | Generated Register Class |
