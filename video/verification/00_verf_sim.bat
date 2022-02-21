@@ -1,0 +1,1 @@
+gtkwave verf_tb.ghw

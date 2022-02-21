@@ -1,0 +1,1 @@
+gtkwave text_overlay_tb.ghw

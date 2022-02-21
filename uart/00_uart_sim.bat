@@ -1,0 +1,1 @@
+gtkwave uart_tb.ghw

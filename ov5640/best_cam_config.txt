@@ -1,0 +1,593 @@
+import serial
+import time
+import sys
+import UART
+from UART import register_read
+from UART import register_write
+
+def format_cmd(addr, data):
+    return ((addr << 8) + data)
+    
+def CAM_DWRITE(addr,data):
+    data1 = data >> 8;
+    full = (addr << 8) + data1;
+    UART.register_write(2,full)
+    time.sleep(50/1000)
+    addr = addr + 1
+    data2 = data & 0xFF
+    full = (addr << 8) + data2;
+    UART.register_write(2,full)
+    time.sleep(50/1000)
+    
+def CAM_WRITE(addr,data):
+    full = (addr << 8) + data;
+    UART.register_write(2,full)
+    time.sleep(50/1000)
+    
+def CAM_READ(addr):
+    UART.register_write(3,(addr<<8))
+    time.sleep(50/1000)
+    x = UART.register_read(5)
+    time.sleep(1/1000)
+    return x
+    
+def CAM_DREAD(addr):
+    UART.register_write(3,(addr<<8))
+    time.sleep(10/1000)
+    save1 = UART.register_read(5)
+    time.sleep(10/1000)
+    addr = addr + 1;
+    UART.register_write(3,(addr<<8))
+    time.sleep(10/1000)
+    save2 = UART.register_read(5)
+    time.sleep(10/1000)
+    save = (save1 << 8) + save2;
+    print(hex(save) + " = " + str(save))
+    return save
+    
+    
+ov5640_config = (
+
+# [0x3035,0x41], # System Clocking[7:4] Sys Div, [3:0] MIPI Div (always 0x1)
+
+#[0x3103,0x11], # Sys Clk From Pad
+[0x3008,0x82], # Software Reset
+[0x3008,0x42], # Chip Power Down
+[0x3103,0x03], # Sys Clk From PLL
+
+[0x3017,0xff], # Data bits as outputs
+[0x3018,0xff], # Data bits as outputs
+
+#[0x3039,0x80],#,Bypass PLL # Todo remove me
+
+[0x3034,0x1a], # [7:4] Charge Pump (always 1), [3:0] BIT Div (0x8 = 2, 0xA = 2.5)
+[0x3035,0x11], # System Clocking[7:4] Sys Div, [3:0] MIPI Div (always 0x1)
+[0x3036,140], # PLL Multiplier
+[0x3037,0x13], # [7:4] PLL Root Bypass or Div2, [3:0] PLL Pre Div
+[0x3108,0x01], # [7:4] PCLK Div, [3:0] SCLK Div
+
+[0x3630,0x36], # Not Documented
+[0x3631,0x0e], # Not Documented
+[0x3632,0xe2], # Not Documented
+[0x3633,0x12], # Not Documented
+[0x3621,0xe0], # Not Documented
+[0x3704,0xa0], # Not Documented
+[0x3703,0x5a], # Not Documented
+[0x3715,0x78], # Not Documented
+[0x3717,0x01], # Not Documented
+[0x370b,0x60], # Not Documented
+[0x3705,0x1a], # Not Documented
+[0x3905,0x02], # Not Documented
+[0x3906,0x10], # Not Documented
+[0x3901,0x0a], # Not Documented
+[0x3731,0x12], # Not Documented
+
+[0x3600,0x08], # VCM
+[0x3601,0x33], # VCM
+
+[0x302d,0x60], # Not documented
+[0x3620,0x52], # Not documented
+[0x371b,0x20], # Not documented
+[0x471c,0x50], # Not documented
+
+[0x3a13,0x43], # AEC
+[0x3a18,0x00], # AEC
+[0x3a19,0xf8], # AEC
+
+[0x3635,0x13], # Not documented
+[0x3636,0x03], # Not documented
+[0x3634,0x40], # Not documented
+[0x3622,0x01], # Not documented
+
+[0x3c01,0x34], # 50/60 Hz Light Fix
+[0x3c04,0x28], # 50/60 Hz Light Fix
+[0x3c05,0x98], # 50/60 Hz Light Fix
+[0x3c06,0x00], # 50/60 Hz Light Fix
+[0x3c07,0x07], # 50/60 Hz Light Fix
+[0x3c08,0x00], # 50/60 Hz Light Fix
+[0x3c09,0x1c], # 50/60 Hz Light Fix
+[0x3c0a,0x9c], # 50/60 Hz Light Fix
+[0x3c0b,0x40], # 50/60 Hz Light Fix
+
+
+[0x3820,0x42], # ISP Control, Flip
+[0x3821,0x02], # ISP Control, Mirror, No binning
+
+[0x3814,0x11], # Sample Increments
+[0x3815,0x11], # Sample Increments
+
+[0x3800,0x01],  # X START
+[0x3801,0x50],  # X START
+[0x3802,0x01],  # Y START
+[0x3803,0xb2],  # Y START
+[0x3804,0x08],  # X END
+[0x3805,0xef],  # X END
+[0x3806,0x05],  # Y END
+[0x3807,0xf2],  # Y END
+[0x3808,0x07],  # DVPHO
+[0x3809,0x80],  # DVPHO
+[0x380a,0x04],  # DVPVO
+[0x380b,0x38],  # DVPVO
+[0x380c,0x09],  # HTS
+[0x380d,0xc4],  # HTS
+[0x380e,0x04],  # VTS
+[0x380f,0x60],  # VTS
+[0x3810,0x00],  # ISP X OFFSET
+[0x3811,0x10],  # ISP X OFFSET
+[0x3812,0x00],  # ISP Y OFFSET
+[0x3813,0x04],  # ISP Y OFFSET
+
+[0x3618,0x04], # Not documented
+[0x3612,0x2b], # Not documented
+[0x3708,0x64], # Not documented
+[0x3709,0x12], # Not documented
+[0x370c,0x00], # Not documented
+
+[0x3a02,0x04], # AEC
+[0x3a03,0x60], # AEC
+[0x3a08,0x01], # AEC
+[0x3a09,0x50], # AEC
+[0x3a0a,0x01], # AEC
+[0x3a0b,0x18], # AEC
+[0x3a0e,0x03], # AEC
+[0x3a0d,0x04], # AEC
+[0x3a14,0x04], # AEC
+[0x3a15,0x60], # AEC
+
+[0x4001,0x02], # BLC
+[0x4004,0x06], # BLC
+
+[0x3000,0x00], # Functional Enables
+[0x3001,0x00], # Functional Enables
+[0x3002,0x00], # Functional Enables
+[0x3004,0xff], # Clock Enables
+[0x3005,0xff], # Clock Enables
+[0x3006,0xff], # Clock Enables
+[0x3007,0xff], # Clock Enables
+
+[0x300e,0x58], # Enable DVP, power down MIPI
+[0x302e,0x00], # Not documented
+[0x4740,0x21], # Active High PCLK and active high HREF
+
+[0x460b,0x35], # VFIFO
+[0x460c,0x20], # VIFO [2] Control PCLK with register 0x3824
+[0x3824,0x01], # DVP PCLK Divider (weird register)
+
+[0x4300,0xF8], # Format Control (select RAW RG GB = 0x03)
+[0x5001,0x01], # ISP Control [7] SDE, [5] Scale, [2] UV, [1] CME, [0] AWB
+[0x501f,0x03], # Format Mux Control (0x03 = ISP RAW DPC)
+[0x5000,0x06], # ISP Control [7] LENC, [5] GMA, [2] BLC, [1] WPC, [0] CIE
+
+# [0x5180,0xff], # AWB 
+# [0x5181,0xf2], # AWB
+# [0x5182,0x00], # AWB
+# [0x5183,0x14], # AWB
+# [0x5184,0x25], # AWB
+# [0x5185,0x24], # AWB
+# [0x5186,0x09], # AWB
+# [0x5187,0x09], # AWB
+# [0x5188,0x09], # AWB
+# [0x5189,0x75], # AWB
+# [0x518a,0x54], # AWB
+# [0x518b,0xe0], # AWB
+# [0x518c,0xb2], # AWB
+# [0x518d,0x42], # AWB
+# [0x518e,0x3d], # AWB
+# [0x518f,0x56], # AWB
+# [0x5190,0x46], # AWB
+# [0x5191,0xf8], # AWB
+# [0x5192,0x04], # AWB
+# [0x5193,0x70], # AWB
+# [0x5194,0xf0], # AWB
+# [0x5195,0xf0], # AWB
+# [0x5196,0x03], # AWB
+# [0x5197,0x01], # AWB
+# [0x5198,0x04], # AWB
+# [0x5199,0x12], # AWB
+# [0x519a,0x04], # AWB
+# [0x519b,0x00], # AWB
+# [0x519c,0x06], # AWB
+# [0x519d,0x82], # AWB
+# [0x519e,0x38], # AWB
+
+#[0x5381,0x1e], # CMX
+#[0x5382,0x5b], # CMX
+#[0x5383,0x08], # CMX
+#[0x5384,0x0a], # CMX
+#[0x5385,0x7e], # CMX
+#[0x5386,0x88], # CMX
+#[0x5387,0x7c], # CMX
+#[0x5388,0x6c], # CMX
+#[0x5389,0x10], # CMX
+#[0x538a,0x01], # CMX
+#[0x538b,0x98], # CMX
+
+[0x5300,0x08], # CIP
+[0x5301,0x30], # CIP
+[0x5302,0x10], # CIP
+[0x5303,0x00], # CIP
+[0x5304,0x08], # CIP
+[0x5305,0x30], # CIP
+[0x5306,0x08], # CIP
+[0x5307,0x16], # CIP
+[0x5309,0x08], # CIP
+[0x530a,0x30], # CIP
+[0x530b,0x04], # CIP
+[0x530c,0x06], # CIP
+
+[0x5480,0x01], # Gamma
+[0x5481,0x08], # Gamma
+[0x5482,0x14], # Gamma
+[0x5483,0x28], # Gamma
+[0x5484,0x51], # Gamma
+[0x5485,0x65], # Gamma
+[0x5486,0x71], # Gamma
+[0x5487,0x7d], # Gamma
+[0x5488,0x87], # Gamma
+[0x5489,0x91], # Gamma
+[0x548a,0x9a], # Gamma
+[0x548b,0xaa], # Gamma
+[0x548c,0xb8], # Gamma
+[0x548d,0xcd], # Gamma
+[0x548e,0xdd], # Gamma
+[0x548f,0xea], # Gamma
+[0x5490,0x1d], # Gamma
+
+[0x5580,0x02], # Digital Effects
+[0x5583,0x40], # Digital Effects
+[0x5584,0x10], # Digital Effects
+[0x5589,0x10], # Digital Effects
+[0x558a,0x00], # Digital Effects
+[0x558b,0xf8], # Digital Effects 
+
+[0x5800,0x23], # LENC
+[0x5801,0x14], # LENC
+[0x5802,0x0f], # LENC
+[0x5803,0x0f], # LENC
+[0x5804,0x12], # LENC
+[0x5805,0x26], # LENC
+[0x5806,0x0c], # LENC
+[0x5807,0x08], # LENC
+[0x5808,0x05], # LENC
+[0x5809,0x05], # LENC
+[0x580a,0x08], # LENC
+[0x580b,0x0d], # LENC
+[0x580c,0x08], # LENC
+[0x580d,0x03], # LENC
+[0x580e,0x00], # LENC
+[0x580f,0x00], # LENC
+[0x5810,0x03], # LENC
+[0x5811,0x09], # LENC
+[0x5812,0x07], # LENC
+[0x5813,0x03], # LENC
+[0x5814,0x00], # LENC
+[0x5815,0x01], # LENC
+[0x5816,0x03], # LENC
+[0x5817,0x08], # LENC
+[0x5818,0x0d], # LENC
+[0x5819,0x08], # LENC
+[0x581a,0x05], # LENC
+[0x581b,0x06], # LENC
+[0x581c,0x08], # LENC
+[0x581d,0x0e], # LENC
+[0x581e,0x29], # LENC
+[0x581f,0x17], # LENC
+[0x5820,0x11], # LENC
+[0x5821,0x11], # LENC
+[0x5822,0x15], # LENC
+[0x5823,0x28], # LENC
+[0x5824,0x46], # LENC
+[0x5825,0x26], # LENC
+[0x5826,0x08], # LENC
+[0x5827,0x26], # LENC
+[0x5828,0x64], # LENC
+[0x5829,0x26], # LENC
+[0x582a,0x24], # LENC
+[0x582b,0x22], # LENC
+[0x582c,0x24], # LENC
+[0x582d,0x24], # LENC
+[0x582e,0x06], # LENC
+[0x582f,0x22], # LENC
+[0x5830,0x40], # LENC
+[0x5831,0x42], # LENC
+[0x5832,0x24], # LENC
+[0x5833,0x26], # LENC
+[0x5834,0x24], # LENC
+[0x5835,0x22], # LENC
+[0x5836,0x22], # LENC
+[0x5837,0x26], # LENC
+[0x5838,0x44], # LENC
+[0x5839,0x24], # LENC
+[0x583a,0x26], # LENC
+[0x583b,0x28], # LENC
+[0x583c,0x42], # LENC
+[0x583d,0xce], # LENC
+
+[0x5025,0x00], # Not documented
+
+[0x3a0f,0x30], # AEC
+[0x3a10,0x28], # AEC
+[0x3a1b,0x30], # AEC
+[0x3a1e,0x26], # AEC
+[0x3a11,0x60], # AEC
+[0x3a1f,0x14], # AEC
+
+[0x4741,0x00],# --DVP Test Pattern Enable, 8 bit
+#[0x503D,0x80],# --Color Bar Enable
+    
+[0x3008,0x02], # Chip Power Up
+#[0x3035,0x21]  # [7:4] Sys Div
+)
+
+def cam_init():
+    
+    # init_seq = [format_cmd(0x3103,0x11)]# --?
+    # init_seq.append(format_cmd(0x3008,0x82))# --[7] SW reset, [6] SW pwdn -> Reset chip
+    # init_seq.append(format_cmd(0x3008,0x42))# --[7] SW reset, [6] SW pwdn -> Pwdn chip
+    # init_seq.append(format_cmd(0x3103,0x03))# --[1] Sysclk select -> 1 = from PLL
+    # init_seq.append(format_cmd(0x3017,0xff))# --[7:0] 1 = VSYNC, HREF, PCLK, datalines as outputs
+    # init_seq.append(format_cmd(0x3018,0xff))# --[7:2]: datalines as outputs
+    
+    # #Clocking
+    # #    0x3034 = Charge pump and data bit mode
+    # #    0x3035 = Sys Clk Divider and PCLK Divider (divide by whatever you put here + 1)
+    # #    0x3036 = PLL Multiplier
+    # #    0x3037 = PLL Root Divider, PLL Pre Divider
+    # #init_seq.append(format_cmd(0x3034,0x1A))# --[6:4] PLL Charge Pump control, [3:0] MIPI bit mode -> 10bit mode
+    # #init_seq.append(format_cmd(0x3035,0x11))# --[7:4] System clock divider, [3:0] MIPI scale divier for PCLK/SERCLK
+    # #init_seq.append(format_cmd(0x3036,144))# --[7:0] PLL Multiplier (4-127) or (128:2:252)
+    # #init_seq.append(format_cmd(0x3037,0x13))# --[4] PLL Root Divider (0 = bypass, 1 = div2), [3:0] PLL PreDiv (1,2,3,5,6,8)
+    # #init_seq.append(format_cmd(0x3108,0x00))# --[5:4] PCLK Root div, [3:2] SCLK2x Root div, [1:0] SCLK Root div
+    
+    # init_seq.append(format_cmd(0x3034,0x1A))# --[6:4] PLL Charge Pump control, [3:0] MIPI bit mode -> 10bit mode
+    # init_seq.append(format_cmd(0x3035,0x21))# --[7:4] System clock divider, [3:0] MIPI scale divier for PCLK/SERCLK
+    # init_seq.append(format_cmd(0x3036,30))# --[7:0] PLL Multiplier (4-127) or (128:2:252)
+    # init_seq.append(format_cmd(0x3037,0x13))# --[4] PLL Root Divider (0 = bypass, 1 = div2), [3:0] PLL PreDiv (1,2,3,5,6,8)
+    # init_seq.append(format_cmd(0x3108,0x01))# --[5:4] PCLK Root div, [3:2] SCLK2x Root div, [1:0] SCLK Root div
+    
+    
+    # #init_seq.append(format_cmd(0x3820,0x41))# --ISP Flip
+    # #init_seq.append(format_cmd(0x3821,0x26))# --ISP Mirror
+    
+    # #init_seq.append(format_cmd(0x3821,0x00))# --ISP Mirror
+    # #init_seq.append(format_cmd(0x3618,0x04))# =
+    # #init_seq.append(format_cmd(0x3612,0x2B))# =
+    # #init_seq.append(format_cmd(0x3709,0x12))# =
+    # #init_seq.append(format_cmd(0x370C,0x00))# =
+    # init_seq.append(format_cmd(0x3800,0x01))# --ISP Timing HS
+    # init_seq.append(format_cmd(0x3801,0x50))# --ISP Timing HS
+    # init_seq.append(format_cmd(0x3802,0x01))# --ISP Timing VS
+    # init_seq.append(format_cmd(0x3803,0xb2))# --ISP Timing VS
+    
+    # init_seq.append(format_cmd(0x3804,0x08))# --ISP Timing HW
+    # init_seq.append(format_cmd(0x3805,0xef))# --ISP Timing HW
+    # init_seq.append(format_cmd(0x3806,0x05))# --ISP Timing VH
+    # init_seq.append(format_cmd(0x3807,0xf1))# --ISP Timing VH
+    
+    # init_seq.append(format_cmd(0x3808,0x07))# --ISP Timing DVPHO
+    # init_seq.append(format_cmd(0x3809,0x80))# --ISP Timing DVPHO
+    # init_seq.append(format_cmd(0x380a,0x04))# --ISP Timing DVPVO
+    # init_seq.append(format_cmd(0x380b,0x38))# --ISP Timing DVPVO
+    
+    # init_seq.append(format_cmd(0x380c,0x08))# --ISP Timing HTS
+    # init_seq.append(format_cmd(0x380d,0x98))# --ISP Timing HTS
+    # init_seq.append(format_cmd(0x380e,0x04))# --ISP Timing VTS
+    # init_seq.append(format_cmd(0x380f,0x65))# --ISP Timing VTS
+    
+    # init_seq.append(format_cmd(0x3810,0x00))# --ISP Timing HOFFSET
+    # init_seq.append(format_cmd(0x3811,0x10))# --ISP Timing HOFFSET
+    # init_seq.append(format_cmd(0x3812,0x00))# --ISP Timing VOFFSET
+    # init_seq.append(format_cmd(0x3813,0x04))# --ISP Timing VOFFSET
+    
+    # init_seq.append(format_cmd(0x3814,0x11))# --ISP Timing X Subsample Increment
+    # init_seq.append(format_cmd(0x3815,0x11))# --ISP Timing Y Subsample Increment
+    
+    # init_seq.append(format_cmd(0x3000,0x00))# --System resets: BIST, MCU, OTP, STB, d5060, timing, array control
+    # init_seq.append(format_cmd(0x3002,0x00))# --System resets: VFIFO, format, JFIFO, SFIFO, JPG, MUX, avg
+    # init_seq.append(format_cmd(0x3004,0xff))# --Clock enable: BIST, MCU, OTP, STROBE, D5060, timing, array control
+    # init_seq.append(format_cmd(0x3006,0xff))# --Clock enable: PSRAM, FMT, JPEG, format mux, avg
+    
+    # init_seq.append(format_cmd(0x4300,0x03))# --Image Format Control, [7:4] = 0 for raw, [3:0] = 0x1 for BGBG/GRGR
+    # init_seq.append(format_cmd(0x501f,0x03))# --Format Mux Control, [3:0] = 0x3 for ISP RAW (DPC)
+    
+    # init_seq.append(format_cmd(0x300e,0x58))# --[2] = 0 for DVP enable
+    # init_seq.append(format_cmd(0x4740,0x21))# --Active High PCLK and active high HREF
+
+    # init_seq.append(format_cmd(0x460c,0x22))# --VFIFO CTRL, [1] PCLK Manual Enable for DVP
+    # init_seq.append(format_cmd(0x3824,0x01))# --DVP PCLK Divider
+    
+    # init_seq.append(format_cmd(0x4709,0x02))# --VSYNC Width Line Unit
+    # init_seq.append(format_cmd(0x470A,0x00))# --VSYNC PCLK WIDTH high
+    # init_seq.append(format_cmd(0x470B,0x10))# --VSYNC PCLK WIDTH low
+    # init_seq.append(format_cmd(0x471D,0x00))# -
+    
+    # init_seq.append(format_cmd(0x4741,0x00))# --DVP Test Pattern Enable, 8 bit
+    # init_seq.append(format_cmd(0x503D,0x80))# --Color Bar Enable
+    # init_seq.append(format_cmd(0x503D,0x00))# --Color Bar Disable
+    
+    # init_seq.append(format_cmd(0x5000,0x06))# --ISP Control: LENC, Gamma, BLC, WPC, Color interp
+    # init_seq.append(format_cmd(0x5001,0x00))# --ISP Control: SDE, Scale enable, UV avg, Color matrix, AWB
+
+
+    # init_seq.append(format_cmd(0x3008,0x02))#--[7] SW reset, [6] SW pwdn -> Power Up Chip
+
+
+
+    #
+    #
+    
+    # init_seq=[format_cmd(0x3008,0x42)]#,	//stop streaming during register setting
+
+    # init_seq.append(format_cmd(0x3103,0x03))#,   //clock source from pll.must be 0x03 for unkown reason (datasheet incorrect)
+    # init_seq.append(format_cmd(0x3017,0xff))#, //output pins enable:vsync,href,pclk,d9-d7
+    # init_seq.append(format_cmd(0x3018,0xff))#, //output pins enable:d0-d5
+    # #init_seq.append(format_cmd(0x302c,0xc2))#, //bit[7:6]: output drive capability:00: 1x   01: 2x  10: 3x  11: 4x
+    # init_seq.append(format_cmd(0x300e,0x58))#, //DVP enable, (default:0x58): 0x58 = 0101 1000 = mipi off, mipiPhy=off; mipiPhy=powerdown, DVP parallel port=0n
+    
+    # init_seq.append(format_cmd(0x4740,0x21))# --Active High PCLK and active high HREF
+        # #init_seq.append(format_cmd(0x471D,0x00))# -
+    
+    # init_seq.append(format_cmd(0x460b,0x35))#, // debug mode??DVP setting
+    # init_seq.append(format_cmd(0x460c,0x20))#, // DVP PCLK divider (default:0x20) (VFIFO control)
+    # #init_seq.append(format_cmd(0x4837,0x11))#, // PCLK Period (default:0x10)
+    # init_seq.append(format_cmd(0x3824,0x01))#, //DVP PCLK divider value
+    # init_seq.append(format_cmd(0x302e,0x00))#, // ??
+    # init_seq.append(format_cmd(0x3000,0x10))#, //reset function blocks (0 = enable),disbale OTP. default:0x30
+    # init_seq.append(format_cmd(0x3001,0x08))#, //reset function blocks, no s2p  default:0x08
+    # init_seq.append(format_cmd(0x3002,0x1c))#, // enable function blocks, ,vfifo,format,average. default:0x1C
+    # init_seq.append(format_cmd(0x3004,0xef))#, //enable  clocks, no otp default:0xCF
+    # init_seq.append(format_cmd(0x3005,0xF7))#, //enable clocks, no s2p. default:0xF7
+    # init_seq.append(format_cmd(0x3006,0xE3))#, // enable clocks,  .default:0xE3
+    # init_seq.append(format_cmd(0x3007,0xE7))#, //enable clocks, no mipi. default:0xf
+    # init_seq.append(format_cmd(0x4300,0x03))#, // Format Control: 
+    # init_seq.append(format_cmd(0x501f,0x03))#, // Format Mux Control
+    
+    # init_seq.append(format_cmd(0x5000,0x06))#, //optimisation enables, lenc[7],gamma[5],bpc[2],  wpc[1],cip[0]
+    # init_seq.append(format_cmd(0x5001,0x00))#, //>>>optimisation enables,  SDE[7], Scaling[5],   UVav[2],CMX[1],AWB[0]
+
+    # #Video Timing and Clocking
+
+    # #init_seq.append(format_cmd(0x3039,0x80))#,Bypass PLL
+   
+    # init_seq.append(format_cmd(0x3034,0x1a))#,//(6-4)=charge pump loop filter. (3-0)=BITdivider. 1a=10bit(default), 18=8bit(a bit faster!)
+    # init_seq.append(format_cmd(0x3035,0x21))#,//(7-4)=SystemClockDivider. (3-0)=MIPIdivider(must stay at 1!). default=0x11
+    # init_seq.append(format_cmd(0x3036,30))#,//(7-0)=Multipiler. default=0x69.  0x46->30fps
+    # init_seq.append(format_cmd(0x3037,0x13))#,//(4)=Rootdivider. (3-0)=Predivider.  default=0x03.
+    # init_seq.append(format_cmd(0x3108,0x01))#,//(5-4)=PCLK Rootdivider=0;(3-2)=sclk2x root divider=dontcare; (1-0)=SCLK root divider; default:0x16.
+
+    # #init_seq.append(format_cmd(0x3035,0x11))#,//(7-4)=SystemClockDivider. (3-0)=MIPIdivider(must stay at 1!). default=0x11
+
+    # DVP_X = 1920;
+    # DVP_Y = 1080;
+ 
+    # HTS = 2500;
+    # VTS = 1120;  
+    
+    # ISP_X = 16
+    # ISP_Y = 4
+ 
+    # X_STA = 0
+    # Y_STA = 0
+    
+    # X_END = 2000;
+    # Y_END = 1120; 
+    
+
+    
+    # init_seq.append(format_cmd(0x3800,(X_STA >> 8)))#,
+    # init_seq.append(format_cmd(0x3801,(X_STA & 0xFF)))#,
+    # init_seq.append(format_cmd(0x3802,(Y_STA >> 8)))#, 
+    # init_seq.append(format_cmd(0x3803,(Y_STA & 0xFF)))#,
+    
+
+    # init_seq.append(format_cmd(0x3804,(X_END >> 8)))#,  
+    # init_seq.append(format_cmd(0x3805,(X_END & 0xFF)))#,
+    # init_seq.append(format_cmd(0x3806,(Y_END >> 8)))#,
+    # init_seq.append(format_cmd(0x3807,(Y_END & 0xFF)))#,
+    
+    
+    # # DVP output area
+
+    # init_seq.append(format_cmd(0x3808,(DVP_X >> 8)))#, //1920
+    # init_seq.append(format_cmd(0x3809,(DVP_X & 0xFF)))#,
+    # init_seq.append(format_cmd(0x380a,(DVP_Y >> 8)))#, //1080
+    # init_seq.append(format_cmd(0x380b,(DVP_Y & 0xFF)))#,
+    
+    # # DVP timing
+
+    # init_seq.append(format_cmd(0x380c,(HTS >> 8)))#, // HTS 2200
+    # init_seq.append(format_cmd(0x380d,(HTS & 0xFF)))#, 
+    # init_seq.append(format_cmd(0x380e,(VTS >> 8)))#, // VTS 1125
+    # init_seq.append(format_cmd(0x380f,(VTS & 0xFF)))#,
+    
+    # # ISP Offset
+
+    # init_seq.append(format_cmd(0x3810,(ISP_X >> 8)))#, 
+    # init_seq.append(format_cmd(0x3811,(ISP_X & 0xFF)))#, //0
+    # init_seq.append(format_cmd(0x3812,(ISP_Y >> 8)))#, 
+    # init_seq.append(format_cmd(0x3813,(ISP_Y & 0xFF)))#, //0
+    
+    
+    # init_seq.append(format_cmd(0x3814,0x11))#,// horizontal subsampling on
+    # init_seq.append(format_cmd(0x3815,0x11))#,// vertical subsampling on = 2x2 binning, reduces picturesize by 4
+    # init_seq.append(format_cmd(0x3821,0x00))#, // horizontal binning on[0] =1  for 2x2.default:0x00, hbinninOn=0x01
+    # init_seq.append(format_cmd(0x3618,0x04))#, // 0x00 for ON
+    # init_seq.append(format_cmd(0x3612,0x2b))#, // 0x29 for ON
+    # init_seq.append(format_cmd(0x3709,0x12))#, // 0x52 for ON
+    # init_seq.append(format_cmd(0x370c,0x00))#, // 0x03 for ON
+    
+    # #init_seq.append(format_cmd(0x4741,0x00))# --DVP Test Pattern Enable, 8 bit
+    # #init_seq.append(format_cmd(0x503D,0x80))# --Color Bar Enable
+   
+    # init_seq.append(format_cmd(0x3008,0x02))#, //poweron at end. start sensor streaming
+ 
+    #
+    #
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+    UART.register_write(4,0x300882)
+    UART.register_write(1,0)
+    time.sleep(1)
+    
+    # for i in init_seq:
+        # UART.register_write(2,i)
+        # time.sleep(50/1000)
+    # time.sleep(1)
+    
+    for i in ov5640_config:
+        CAM_WRITE(i[0],i[1])
+        time.sleep(1/1000)
+        x = CAM_READ(i[0])
+        time.sleep(1/1000)
+        if(x != i[1] and i[0] != 0x3008):
+            print("Bad write at address " + str(hex(i[0])))
+            time.sleep(5)
+        
+    time.sleep(1)
+
+    UART.register_write(3,0x300A00)
+    time.sleep(100/1000)
+    UART.register_read(5)
+    UART.register_write(3,0x300B00)
+    time.sleep(100/1000)
+    UART.register_read(5)       
+    
+cam_init()
+    
+
+

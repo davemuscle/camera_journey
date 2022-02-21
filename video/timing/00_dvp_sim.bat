@@ -1,0 +1,1 @@
+gtkwave dvp_tb.ghw

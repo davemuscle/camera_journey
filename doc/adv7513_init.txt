@@ -1,0 +1,17 @@
+-- --[15:8] = base address, [7:0] = byte value
+-- --this needs to infer as a rom
+constant init_wr_seq : cmd_array_t := (
+	0  => x"4110", --[6] = 0 for chip power up								
+	1  => x"9803", --fixed registers given by AD
+	2  => x"9AE0",
+	3  => x"9C30",
+	4  => x"9D01", 
+	5  => x"A2A4",
+	6  => x"A3A4",
+	7  => x"E0D0",
+	8  => x"F900",	
+	9  => x"1500", --[3:0] = 0 -> 4:4:4 RGB Separate Syncs Input Format
+	10 => x"1630", --[7]   = 0 -> 4:4:4 output format, [4:3] = 3 -> 8 bit input colors
+	11 => x"1702", --[6:5] = 0 -> High sync polarities, [1] = 1 -> 16:9 input aspect ratio
+	12 => x"AF06"  --[2]   = 1 -> fixed value, [1] = 1 -> HDMI mode
+);
