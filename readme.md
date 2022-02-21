@@ -257,10 +257,6 @@ or bitfield locations.
 
 Description | Image
 :--: | :--: 
-Register File with Comments for Parsing | ![Image](/doc/example_register_desc.png) 
-
-
-| ![Image](/doc/FPGA_def_class.png) | ![Image](/doc/REG_def_class.png) |
-| Register File with Comments for Parsing | Generated FPGA Class | Generated Register Class |
-| ![Image](/doc/example_register_desc.png) | ![Image](/doc/FPGA_def_class.png) | ![Image](/doc/REG_def_class.png) |
-| Register File with Comments for Parsing | Generated FPGA Class | Generated Register Class |
+VHDL Register File with Comments for Parsing | ![Image](/doc/example_register_desc.png) 
+Generated FPGA Class | ![Image](/doc/FPGA_def_class.png) 
+Generated Register Class | ![Image](/doc/REG_def_class.png)
