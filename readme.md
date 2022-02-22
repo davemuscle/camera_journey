@@ -325,7 +325,7 @@ GIF below you can see the parallax effect for a flash drive closely in front of 
 is the same thing as putting your thumb in front of your face, then alternating between which eye
 you have open.
 
-![Image](/doc/cam_skew.gif)
+![Image](/doc/cam_switching.gif)
 :--:
 *Camera Parallax*
 
